@@ -43,10 +43,11 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             ninja-build pkg-config cmake bison flex git ca-certificates \
             llvm-dev clang glslang-tools \
-            libx11-dev libxext-dev libxfixes-dev \
+            libx11-dev libx11-xcb-dev libxext-dev libxfixes-dev \
             libxcb1-dev libxcb-randr0-dev libxcb-shm0-dev \
             libxcb-dri2-0-dev libxcb-dri3-dev libxcb-present-dev \
             libxcb-glx0-dev libxcb-xfixes0-dev libxcb-sync-dev \
+            libxcb-keysyms1-dev \
             libxshmfence-dev libxxf86vm-dev libxrandr-dev \
             libdrm-dev libwayland-dev wayland-protocols libwayland-egl-backend-dev
 

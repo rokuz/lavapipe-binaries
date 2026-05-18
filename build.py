@@ -22,8 +22,9 @@ Prerequisites:
   Linux (Debian/Ubuntu):
     sudo apt install ninja-build pkg-config cmake bison flex \\
       llvm-dev clang glslang-tools \\
-      libx11-dev libxext-dev libxfixes-dev libxcb1-dev libxcb-randr0-dev \\
-      libxcb-shm0-dev libxshmfence-dev libxxf86vm-dev libxrandr-dev \\
+      libx11-dev libx11-xcb-dev libxext-dev libxfixes-dev \\
+      libxcb1-dev libxcb-randr0-dev libxcb-shm0-dev libxcb-keysyms1-dev \\
+      libxshmfence-dev libxxf86vm-dev libxrandr-dev \\
       libdrm-dev libwayland-dev wayland-protocols
     # Mesa needs meson >= 1.4; Ubuntu 24.04's apt meson is older, use pip.
     pip3 install 'meson>=1.4.0' mako packaging pyyaml
