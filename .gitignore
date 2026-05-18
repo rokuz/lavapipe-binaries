@@ -1,0 +1,5 @@
+src/
+install/
+artifacts/
+__pycache__/
+*.zip

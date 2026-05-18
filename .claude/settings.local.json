@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git ls-remote *)",
+      "Bash(python3 -c \"import ast; ast.parse\\(open\\('/Users/rokuz/Dev/Projects/lavapipe_binaries/build.py'\\).read\\(\\)\\)\")",
+      "Bash(python3 /Users/rokuz/Dev/Projects/lavapipe_binaries/build.py --help)",
+      "Bash(python3 *)"
+    ]
+  }
+}

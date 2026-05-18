@@ -1,0 +1,155 @@
+name: Build Lavapipe
+
+on:
+  workflow_dispatch:
+    inputs:
+      mesa_repo:
+        description: 'Mesa git repository URL'
+        required: false
+        default: 'https://gitlab.freedesktop.org/mesa/mesa.git'
+      mesa_ref:
+        description: 'Mesa git ref (branch, tag, or commit hash)'
+        required: false
+        default: 'main'
+      vulkan_sdk_ref:
+        description: 'Vulkan-Headers/Vulkan-Loader git ref'
+        required: false
+        default: 'vulkan-sdk-1.4.341.0'
+      llvm_ref:
+        description: 'LLVM git ref (Windows only; ignored on Linux which uses apt LLVM)'
+        required: false
+        default: 'llvmorg-19.1.7'
+
+jobs:
+  build-linux:
+    name: build-linux-x86_64-${{ matrix.build_type }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        build_type: [release, debug]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install apt dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            meson ninja-build pkg-config cmake bison flex git ca-certificates \
+            llvm-dev libllvm-dev clang \
+            libx11-dev libxext-dev libxfixes-dev \
+            libxcb1-dev libxcb-randr0-dev libxcb-shm0-dev \
+            libxcb-dri2-0-dev libxcb-dri3-dev libxcb-present-dev \
+            libxcb-glx0-dev libxcb-xfixes0-dev libxcb-sync-dev \
+            libxshmfence-dev libxxf86vm-dev libxrandr-dev \
+            libdrm-dev libwayland-dev wayland-protocols libwayland-egl-backend-dev
+
+      - name: Install Python build packages
+        run: pip3 install mako packaging pyyaml
+
+      - name: Build Lavapipe (${{ matrix.build_type }})
+        run: >
+          python3 build.py
+          --mesa-repo "${{ inputs.mesa_repo }}"
+          --mesa-ref "${{ inputs.mesa_ref }}"
+          --vulkan-sdk-ref "${{ inputs.vulkan_sdk_ref }}"
+          --build-type "${{ matrix.build_type }}"
+          --output-dir artifacts
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: lavapipe-linux-x86_64-${{ matrix.build_type }}
+          path: artifacts/lavapipe-linux-x86_64-${{ matrix.build_type }}.zip
+
+  build-windows:
+    name: build-windows-x86_64-${{ matrix.build_type }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        build_type: [release, debug]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Setup MSVC environment (x64)
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Install build tools (chocolatey)
+        shell: pwsh
+        run: |
+          choco install -y --no-progress winflexbison pkgconfiglite ninja
+
+      - name: Install Python build packages
+        run: pip install meson mako packaging pyyaml
+
+      - name: Cache LLVM install
+        id: cache-llvm
+        uses: actions/cache@v4
+        with:
+          path: install/deps/llvm
+          key: llvm-${{ inputs.llvm_ref }}-windows-msvc-x64-v1
+
+      - name: Build Lavapipe (${{ matrix.build_type }})
+        shell: cmd
+        run: >
+          python build.py
+          --mesa-repo "${{ inputs.mesa_repo }}"
+          --mesa-ref "${{ inputs.mesa_ref }}"
+          --vulkan-sdk-ref "${{ inputs.vulkan_sdk_ref }}"
+          --llvm-ref "${{ inputs.llvm_ref }}"
+          --build-type "${{ matrix.build_type }}"
+          --output-dir artifacts
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: lavapipe-windows-x86_64-${{ matrix.build_type }}
+          path: artifacts/lavapipe-windows-x86_64-${{ matrix.build_type }}.zip
+
+  release:
+    name: Create release
+    needs: [build-linux, build-windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: List artifacts
+        run: ls -la artifacts/
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: mesa-${{ inputs.mesa_ref }}
+          name: Lavapipe (Mesa ${{ inputs.mesa_ref }})
+          body: |
+            Pre-built Lavapipe (Mesa swrast Vulkan driver) for Linux x86_64 and Windows x86_64, in both release and debug flavors.
+
+            | Dependency | Ref |
+            |---|---|
+            | Mesa | `${{ inputs.mesa_ref }}` |
+            | Vulkan-Headers / Vulkan-Loader | `${{ inputs.vulkan_sdk_ref }}` |
+            | LLVM (Windows) | `${{ inputs.llvm_ref }}` |
+          files: artifacts/*.zip
+          fail_on_unmatched_files: true
