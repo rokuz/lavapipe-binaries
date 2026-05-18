@@ -21,12 +21,13 @@ On Windows, Mesa debug builds link to release LLVM (LLVM is built once as releas
 
 ```bash
 # Prerequisites (Debian/Ubuntu)
-sudo apt install meson ninja-build pkg-config cmake bison flex \
-  llvm-dev clang \
+sudo apt install ninja-build pkg-config cmake bison flex \
+  llvm-dev clang glslang-tools \
   libx11-dev libxext-dev libxfixes-dev libxcb1-dev libxcb-randr0-dev \
   libxcb-shm0-dev libxshmfence-dev libxxf86vm-dev libxrandr-dev \
   libdrm-dev libwayland-dev wayland-protocols
-pip3 install mako packaging pyyaml
+# Mesa requires meson >= 1.4; apt's meson on Ubuntu 24.04 is too old.
+pip3 install 'meson>=1.4.0' mako packaging pyyaml
 
 # Build (default: Mesa main branch, release)
 python3 build.py --mesa-ref main
@@ -40,8 +41,9 @@ Run from a **x64 Native Tools Command Prompt for VS 2022**.
 
 ```bat
 :: Prerequisites
-choco install winflexbison pkgconfiglite ninja cmake git python glslang
+choco install winflexbison pkgconfiglite ninja cmake git python
 pip install meson mako packaging pyyaml
+:: glslang is built from source by build.py (no chocolatey package exists).
 
 :: Build (clones and builds LLVM from source the first time — slow)
 python build.py --mesa-ref main

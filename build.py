@@ -20,17 +20,19 @@ Layout (relative to cwd):
 
 Prerequisites:
   Linux (Debian/Ubuntu):
-    sudo apt install meson ninja-build pkg-config cmake bison flex \\
-      llvm-dev clang \\
+    sudo apt install ninja-build pkg-config cmake bison flex \\
+      llvm-dev clang glslang-tools \\
       libx11-dev libxext-dev libxfixes-dev libxcb1-dev libxcb-randr0-dev \\
       libxcb-shm0-dev libxshmfence-dev libxxf86vm-dev libxrandr-dev \\
       libdrm-dev libwayland-dev wayland-protocols
-    pip3 install mako packaging pyyaml
+    # Mesa needs meson >= 1.4; Ubuntu 24.04's apt meson is older, use pip.
+    pip3 install 'meson>=1.4.0' mako packaging pyyaml
 
   Windows (MSVC):
     - Visual Studio 2022 with the "Desktop development with C++" workload
     - Python 3.10+, plus: pip install meson ninja mako packaging pyyaml
-    - choco install winflexbison pkgconfiglite cmake git glslang
+    - choco install winflexbison pkgconfiglite cmake git
+    - glslang is built from source by this script (no chocolatey package).
     - LLVM dev libraries: pass --llvm-prefix to a prebuilt install, or omit
       and this script will clone and build LLVM from source (~30-60 min).
     Run inside a "x64 Native Tools Command Prompt for VS 2022".
@@ -52,6 +54,7 @@ IS_LINUX = platform.system() == "Linux"
 MESA_REPO = "https://gitlab.freedesktop.org/mesa/mesa.git"
 VULKAN_HEADERS_URL = "https://github.com/KhronosGroup/Vulkan-Headers.git"
 VULKAN_LOADER_URL = "https://github.com/KhronosGroup/Vulkan-Loader.git"
+GLSLANG_URL = "https://github.com/KhronosGroup/glslang.git"
 LLVM_REPO_URL = "https://github.com/llvm/llvm-project.git"
 LLVM_DEFAULT_REF = "llvmorg-19.1.7"
 
@@ -176,6 +179,46 @@ def build_and_install_vulkan_loader(src_dir, install_dir, deps_dir, vulkan_sdk_r
         "--config", "Release",
         "--prefix", str(install_dir),
     ])
+
+
+def build_glslang(src_dir, deps_dir, glslang_ref):
+    """Build glslang (provides glslangValidator) — Windows path.
+
+    glslang isn't packaged on Chocolatey, so we build it from source. Small
+    (~2-5 min) Release build, shared across debug/release Mesa builds.
+    """
+    glslang_src = src_dir / "glslang-src"
+    glslang_build = src_dir / "glslang-build"
+    glslang_install = deps_dir / "glslang"
+
+    if list(glslang_install.glob("bin/glslangValidator*")):
+        print(f"--- glslang already installed at {glslang_install} ---")
+        return glslang_install
+
+    clone(GLSLANG_URL, glslang_ref, glslang_src, "glslang")
+
+    # Fetch SPIRV-Tools / SPIRV-Headers into glslang's External/ tree.
+    update_script = glslang_src / "update_glslang_sources.py"
+    if update_script.is_file():
+        print("--- Fetching glslang external sources ---")
+        run([sys.executable, str(update_script)], cwd=str(glslang_src))
+
+    print("--- Building glslang ---")
+    cmake_args = [
+        "cmake", "-S", str(glslang_src), "-B", str(glslang_build),
+        "-DCMAKE_BUILD_TYPE=Release",
+        f"-DCMAKE_INSTALL_PREFIX={glslang_install}",
+        "-DGLSLANG_TESTS=OFF",
+        "-DENABLE_OPT=OFF",
+        "-DBUILD_SHARED_LIBS=OFF",
+    ]
+    if IS_WINDOWS:
+        cmake_args += ["-G", "Ninja"]
+    run(cmake_args)
+    run(["cmake", "--build", str(glslang_build), "--config", "Release",
+         f"-j{cpu_count()}"])
+    run(["cmake", "--install", str(glslang_build), "--config", "Release"])
+    return glslang_install
 
 
 def build_llvm(src_dir, deps_dir, llvm_ref):
@@ -378,6 +421,14 @@ def main():
     if llvm_prefix is None and IS_WINDOWS:
         llvm_prefix = build_llvm(src_dir, deps_dir, args.llvm_ref)
     print(f"Using LLVM prefix: {llvm_prefix or '<system llvm-config>'}")
+
+    if IS_WINDOWS:
+        # glslang isn't on chocolatey; build it and prepend to PATH so Mesa's
+        # meson find_program('glslangValidator') succeeds.
+        glslang_prefix = build_glslang(src_dir, deps_dir, args.vulkan_sdk_ref)
+        os.environ["PATH"] = (
+            f"{glslang_prefix / 'bin'}{path_sep()}{os.environ.get('PATH', '')}"
+        )
 
     mesa_src = clone(args.mesa_repo, args.mesa_ref, src_dir / "mesa", "Mesa")
 
