@@ -98,9 +98,9 @@ jobs:
       - name: Install Python build packages
         run: pip install meson mako packaging pyyaml
 
-      - name: Cache LLVM install
-        id: cache-llvm
-        uses: actions/cache@v4
+      - name: Restore LLVM cache
+        id: cache-llvm-restore
+        uses: actions/cache/restore@v4
         with:
           path: install/deps/llvm
           key: llvm-${{ inputs.llvm_ref }}-windows-msvc-x64-v1
@@ -115,6 +115,15 @@ jobs:
           --llvm-ref "${{ inputs.llvm_ref }}"
           --build-type "${{ matrix.build_type }}"
           --output-dir artifacts
+
+      # Save the LLVM cache even if later steps (Mesa build) fail, so we
+      # don't have to rebuild LLVM again next run.
+      - name: Save LLVM cache
+        if: always() && steps.cache-llvm-restore.outputs.cache-hit != 'true' && hashFiles('install/deps/llvm/bin/llvm-config*') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: install/deps/llvm
+          key: ${{ steps.cache-llvm-restore.outputs.cache-primary-key }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
