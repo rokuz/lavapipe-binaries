@@ -42,7 +42,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             meson ninja-build pkg-config cmake bison flex git ca-certificates \
-            llvm-dev libllvm-dev clang \
+            llvm-dev clang \
             libx11-dev libxext-dev libxfixes-dev \
             libxcb1-dev libxcb-randr0-dev libxcb-shm0-dev \
             libxcb-dri2-0-dev libxcb-dri3-dev libxcb-present-dev \
@@ -92,7 +92,7 @@ jobs:
       - name: Install build tools (chocolatey)
         shell: pwsh
         run: |
-          choco install -y --no-progress winflexbison pkgconfiglite ninja
+          choco install -y --no-progress winflexbison pkgconfiglite ninja glslang
 
       - name: Install Python build packages
         run: pip install meson mako packaging pyyaml

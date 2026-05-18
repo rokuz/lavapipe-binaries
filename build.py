@@ -21,7 +21,7 @@ Layout (relative to cwd):
 Prerequisites:
   Linux (Debian/Ubuntu):
     sudo apt install meson ninja-build pkg-config cmake bison flex \\
-      llvm-dev libllvm-dev clang \\
+      llvm-dev clang \\
       libx11-dev libxext-dev libxfixes-dev libxcb1-dev libxcb-randr0-dev \\
       libxcb-shm0-dev libxshmfence-dev libxxf86vm-dev libxrandr-dev \\
       libdrm-dev libwayland-dev wayland-protocols
@@ -30,7 +30,7 @@ Prerequisites:
   Windows (MSVC):
     - Visual Studio 2022 with the "Desktop development with C++" workload
     - Python 3.10+, plus: pip install meson ninja mako packaging pyyaml
-    - choco install winflexbison pkgconfiglite cmake git
+    - choco install winflexbison pkgconfiglite cmake git glslang
     - LLVM dev libraries: pass --llvm-prefix to a prebuilt install, or omit
       and this script will clone and build LLVM from source (~30-60 min).
     Run inside a "x64 Native Tools Command Prompt for VS 2022".

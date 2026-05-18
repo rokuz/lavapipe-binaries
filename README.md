@@ -22,7 +22,7 @@ On Windows, Mesa debug builds link to release LLVM (LLVM is built once as releas
 ```bash
 # Prerequisites (Debian/Ubuntu)
 sudo apt install meson ninja-build pkg-config cmake bison flex \
-  llvm-dev libllvm-dev clang \
+  llvm-dev clang \
   libx11-dev libxext-dev libxfixes-dev libxcb1-dev libxcb-randr0-dev \
   libxcb-shm0-dev libxshmfence-dev libxxf86vm-dev libxrandr-dev \
   libdrm-dev libwayland-dev wayland-protocols
@@ -40,7 +40,7 @@ Run from a **x64 Native Tools Command Prompt for VS 2022**.
 
 ```bat
 :: Prerequisites
-choco install winflexbison pkgconfiglite ninja cmake git python
+choco install winflexbison pkgconfiglite ninja cmake git python glslang
 pip install meson mako packaging pyyaml
 
 :: Build (clones and builds LLVM from source the first time — slow)
