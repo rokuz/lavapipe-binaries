@@ -296,10 +296,12 @@ def build_mesa(mesa_src, src_dir, install_dir, deps_dir, llvm_prefix, build_type
         f"--prefix={install_dir}",
     ]
     if IS_WINDOWS:
+        # `--prefer-static` makes find_library() demand a static-named lib
+        # even for Windows SDK import libs like ws2_32, which then fails.
+        # `-Dshared-llvm=disabled` already forces static LLVM linking.
         meson_args += [
             "-Dplatforms=windows",
             "-Dshared-llvm=disabled",
-            "--prefer-static",
         ]
         if build_type == "debug":
             # Force the release CRT so Mesa links cleanly against our release LLVM
