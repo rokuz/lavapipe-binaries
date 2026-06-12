@@ -57,7 +57,7 @@ VULKAN_HEADERS_URL = "https://github.com/KhronosGroup/Vulkan-Headers.git"
 VULKAN_LOADER_URL = "https://github.com/KhronosGroup/Vulkan-Loader.git"
 GLSLANG_URL = "https://github.com/KhronosGroup/glslang.git"
 LLVM_REPO_URL = "https://github.com/llvm/llvm-project.git"
-LLVM_DEFAULT_REF = "llvmorg-19.1.7"
+LLVM_DEFAULT_REF = "llvmorg-21.1.8"
 
 BUILD_TYPES = ("release", "debug")
 

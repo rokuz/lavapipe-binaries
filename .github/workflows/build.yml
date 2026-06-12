@@ -18,7 +18,15 @@ on:
       llvm_ref:
         description: 'LLVM git ref (Windows only; ignored on Linux which uses apt LLVM)'
         required: false
-        default: 'llvmorg-19.1.7'
+        default: 'llvmorg-21.1.8'
+      clang_version:
+        description: 'Clang/LLVM version for the Linux build (from apt.llvm.org)'
+        required: false
+        type: choice
+        default: '21'
+        options:
+          - '21'
+          - '18'
 
 jobs:
   build-linux:
@@ -42,7 +50,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             ninja-build pkg-config cmake bison flex git ca-certificates \
-            llvm-dev clang glslang-tools \
+            wget gnupg lsb-release software-properties-common glslang-tools \
             libx11-dev libx11-xcb-dev libxext-dev libxfixes-dev \
             libxcb1-dev libxcb-randr0-dev libxcb-shm0-dev \
             libxcb-dri2-0-dev libxcb-dri3-dev libxcb-present-dev \
@@ -51,10 +59,25 @@ jobs:
             libxshmfence-dev libxxf86vm-dev libxrandr-dev \
             libdrm-dev libwayland-dev wayland-protocols libwayland-egl-backend-dev
 
+      - name: Install Clang/LLVM ${{ inputs.clang_version }}
+        run: |
+          wget -O /tmp/llvm.sh https://apt.llvm.org/llvm.sh
+          chmod +x /tmp/llvm.sh
+          sudo /tmp/llvm.sh ${{ inputs.clang_version }}
+          sudo apt-get install -y --no-install-recommends \
+            clang-${{ inputs.clang_version }} llvm-${{ inputs.clang_version }}-dev
+          sudo update-alternatives --install /usr/bin/llvm-config llvm-config \
+            /usr/bin/llvm-config-${{ inputs.clang_version }} 100
+          clang-${{ inputs.clang_version }} --version
+          llvm-config --version
+
       - name: Install Python build packages
         run: pip3 install 'meson>=1.4.0' mako packaging pyyaml
 
       - name: Build Lavapipe (${{ matrix.build_type }})
+        env:
+          CC: clang-${{ inputs.clang_version }}
+          CXX: clang++-${{ inputs.clang_version }}
         run: >
           python3 build.py
           --mesa-repo "${{ inputs.mesa_repo }}"
@@ -160,6 +183,7 @@ jobs:
             |---|---|
             | Mesa | `${{ inputs.mesa_ref }}` |
             | Vulkan-Headers / Vulkan-Loader | `${{ inputs.vulkan_sdk_ref }}` |
+            | Clang/LLVM (Linux) | `${{ inputs.clang_version }}` |
             | LLVM (Windows) | `${{ inputs.llvm_ref }}` |
           files: artifacts/*.zip
           fail_on_unmatched_files: true
