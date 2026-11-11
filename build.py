@@ -61,8 +61,11 @@ LLVM_DEFAULT_REF = "llvmorg-21.1.8"
 WAYLAND_REPO_URL = "https://gitlab.freedesktop.org/wayland/wayland.git"
 # Mesa may fall back to a newer wayland-protocols subproject than the distro
 # ships; its XML (e.g. `frozen` attribute in 1.49) must validate against the
-# scanner's built-in DTD under --strict, so the scanner must be >= 1.25.
-WAYLAND_SCANNER_REF = "1.26.0"
+# scanner's built-in DTD under --strict, which needs a DTD from wayland >= 1.25.
+# Meson's wayland module also requires the scanner version to equal the
+# wayland-client version exactly, so we build the scanner at the system
+# wayland-client version but embed the DTD from this newer ref.
+WAYLAND_DTD_REF = "1.26.0"
 
 BUILD_TYPES = ("release", "debug")
 
@@ -268,17 +271,35 @@ def build_llvm(src_dir, deps_dir, llvm_ref):
 
 
 def build_wayland_scanner(src_dir, deps_dir):
-    """Build a recent wayland-scanner only (Linux); libraries stay from the distro."""
-    wl_src = src_dir / "wayland-src"
-    wl_build = src_dir / "wayland-build"
-    wl_install = deps_dir / "wayland-scanner"
+    """Build wayland-scanner (Linux) matching the system wayland-client version,
+    with a newer embedded DTD. Libraries stay from the distro.
+
+    Returns the install prefix, or None if system wayland-client isn't found.
+    """
+    try:
+        client_ver = subprocess.run(
+            ["pkg-config", "--modversion", "wayland-client"],
+            check=True, capture_output=True, text=True,
+        ).stdout.strip()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        print("--- wayland-client not found via pkg-config; using system wayland-scanner ---")
+        return None
+
+    wl_src = src_dir / f"wayland-src-{client_ver}"
+    wl_build = src_dir / f"wayland-build-{client_ver}"
+    wl_install = deps_dir / f"wayland-scanner-{client_ver}"
 
     if (wl_install / "bin" / "wayland-scanner").is_file():
         print(f"--- wayland-scanner already installed at {wl_install} ---")
         return wl_install
 
-    clone(WAYLAND_REPO_URL, WAYLAND_SCANNER_REF, wl_src, "Wayland")
-    print("--- Building wayland-scanner ---")
+    clone(WAYLAND_REPO_URL, client_ver, wl_src, f"Wayland {client_ver}")
+    print(f"--- Replacing wayland.dtd with the one from Wayland {WAYLAND_DTD_REF} ---")
+    run(["git", "-C", str(wl_src), "fetch", "--depth", "1", "origin",
+         "tag", WAYLAND_DTD_REF])
+    run(["git", "-C", str(wl_src), "checkout", WAYLAND_DTD_REF, "--",
+         "protocol/wayland.dtd"])
+    print(f"--- Building wayland-scanner {client_ver} ---")
     run([
         "meson", "setup", str(wl_src), str(wl_build),
         "--buildtype=release",
