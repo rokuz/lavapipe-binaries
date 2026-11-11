@@ -57,7 +57,8 @@ jobs:
             libxcb-glx0-dev libxcb-xfixes0-dev libxcb-sync-dev \
             libxcb-keysyms1-dev \
             libxshmfence-dev libxxf86vm-dev libxrandr-dev \
-            libdrm-dev libwayland-dev wayland-protocols libwayland-egl-backend-dev
+            libdrm-dev libwayland-dev wayland-protocols libwayland-egl-backend-dev \
+            libexpat1-dev libxml2-dev
 
       - name: Install Clang/LLVM ${{ inputs.clang_version }}
         run: |

@@ -25,7 +25,7 @@ Prerequisites:
       libx11-dev libx11-xcb-dev libxext-dev libxfixes-dev \\
       libxcb1-dev libxcb-randr0-dev libxcb-shm0-dev libxcb-keysyms1-dev \\
       libxshmfence-dev libxxf86vm-dev libxrandr-dev \\
-      libdrm-dev libwayland-dev wayland-protocols
+      libdrm-dev libwayland-dev wayland-protocols libexpat1-dev libxml2-dev
     # Mesa needs meson >= 1.4; Ubuntu 24.04's apt meson is older, use pip.
     pip3 install 'meson>=1.4.0' mako packaging pyyaml
 
@@ -58,6 +58,11 @@ VULKAN_LOADER_URL = "https://github.com/KhronosGroup/Vulkan-Loader.git"
 GLSLANG_URL = "https://github.com/KhronosGroup/glslang.git"
 LLVM_REPO_URL = "https://github.com/llvm/llvm-project.git"
 LLVM_DEFAULT_REF = "llvmorg-21.1.8"
+WAYLAND_REPO_URL = "https://gitlab.freedesktop.org/wayland/wayland.git"
+# Mesa may fall back to a newer wayland-protocols subproject than the distro
+# ships; its XML (e.g. `frozen` attribute in 1.49) must validate against the
+# scanner's built-in DTD under --strict, so the scanner must be >= 1.25.
+WAYLAND_SCANNER_REF = "1.26.0"
 
 BUILD_TYPES = ("release", "debug")
 
@@ -262,7 +267,36 @@ def build_llvm(src_dir, deps_dir, llvm_ref):
     return llvm_install
 
 
-def build_mesa(mesa_src, src_dir, install_dir, deps_dir, llvm_prefix, build_type):
+def build_wayland_scanner(src_dir, deps_dir):
+    """Build a recent wayland-scanner only (Linux); libraries stay from the distro."""
+    wl_src = src_dir / "wayland-src"
+    wl_build = src_dir / "wayland-build"
+    wl_install = deps_dir / "wayland-scanner"
+
+    if (wl_install / "bin" / "wayland-scanner").is_file():
+        print(f"--- wayland-scanner already installed at {wl_install} ---")
+        return wl_install
+
+    clone(WAYLAND_REPO_URL, WAYLAND_SCANNER_REF, wl_src, "Wayland")
+    print("--- Building wayland-scanner ---")
+    run([
+        "meson", "setup", str(wl_src), str(wl_build),
+        "--buildtype=release",
+        f"--prefix={wl_install}",
+        "--libdir=lib",
+        "-Dlibraries=false",
+        "-Dscanner=true",
+        "-Dtests=false",
+        "-Ddocumentation=false",
+        "-Ddtd_validation=true",
+    ])
+    run(["ninja", "-C", str(wl_build)])
+    run(["meson", "install", "-C", str(wl_build)])
+    return wl_install
+
+
+def build_mesa(mesa_src, src_dir, install_dir, deps_dir, llvm_prefix, build_type,
+               wayland_scanner_prefix=None):
     mesa_build = src_dir / f"mesa-build-{build_type}"
 
     print(f"--- Building Lavapipe (Mesa swrast Vulkan driver) [{build_type}] ---")
@@ -270,7 +304,13 @@ def build_mesa(mesa_src, src_dir, install_dir, deps_dir, llvm_prefix, build_type
     env = os.environ.copy()
     if llvm_prefix is not None:
         env["PATH"] = f"{llvm_prefix / 'bin'}{path_sep()}{env.get('PATH', '')}"
-    pkg_paths = [
+    pkg_paths = []
+    if wayland_scanner_prefix is not None:
+        # Mesa and the wayland-protocols subproject locate the scanner via
+        # pkg-config's `wayland_scanner` variable, not PATH.
+        pkg_paths.append(str(wayland_scanner_prefix / "lib" / "pkgconfig"))
+        env["PATH"] = f"{wayland_scanner_prefix / 'bin'}{path_sep()}{env.get('PATH', '')}"
+    pkg_paths += [
         str(deps_dir / "lib" / "pkgconfig"),
         str(deps_dir / "vulkan-headers" / "share" / "pkgconfig"),
     ]
@@ -440,7 +480,11 @@ def main():
     mesa_src = clone(args.mesa_repo, args.mesa_ref, src_dir / "mesa", "Mesa")
 
     build_and_install_vulkan_loader(src_dir, install_dir, deps_dir, args.vulkan_sdk_ref)
-    build_mesa(mesa_src, src_dir, install_dir, deps_dir, llvm_prefix, args.build_type)
+    wayland_scanner_prefix = None
+    if IS_LINUX:
+        wayland_scanner_prefix = build_wayland_scanner(src_dir, deps_dir)
+    build_mesa(mesa_src, src_dir, install_dir, deps_dir, llvm_prefix, args.build_type,
+               wayland_scanner_prefix)
     fix_icd_library_paths(install_dir)
     validate(install_dir)
 
